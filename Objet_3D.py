@@ -5,6 +5,7 @@ import glfw
 import numpy as np
 from Outils import create_program_from_file
 import pyrr
+from ctypes import *
 
 rot3 = pyrr.matrix33.create_from_z_rotation(np.pi/2)
 rot4 = pyrr.matrix44.create_from_matrix33(rot3)                  
@@ -42,14 +43,18 @@ class Game(object):
         glfw.make_context_current(self.window)
         glfw.swap_interval(1)
         # activation de la gestion de la profondeur
-        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glEnable(GL.GL_DEPTH_TEST)   #permet de repérer la profondeur et d'avoir un effet 3D
 
     def init_programs(self):
-        id = create_program_from_file("shader.vert", "shader.frag")    #Renvoie l'id du GPU   #bien se mettre sur le dossier /TP3 !
+        id = create_program_from_file("phong.vert", "phong.frag")    #Renvoie l'id du GPU   #bien se mettre sur le dossier /TP3 !
         GL.glUseProgram(id)
         
     def init_data(self):
-        sommets = np.array(((0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 0), (1, 0, 0), (0, 0, 1)), np.float32)
+        sommets = np.array(((0, 0, 0),(0, 0, 1),
+                        (1, 0, 0), (-0.5774,-0.5774,-0.5774),
+                        (0, 1, 0),(-0.5774,-0.5774,-0.5774),
+                        (0, 0, 1) ,(-0.5,-0.5,0.707)), np.float32)
+        index=np.array(((0, 1, 2), (1, 3, 2)), np.uint32)
 
         # attribution d'une liste d'´ etat (1 indique la cr´ eation d'une seule liste)
         vao = GL.glGenVertexArrays(1)
@@ -68,10 +73,21 @@ class Game(object):
 
         # Active l'utilisation des donn´ ees de positions
         # (le 0 correspond ` a la location dans le vertex shader)
-        GL.glEnableVertexAttribArray(0)
+        GL.glEnableVertexAttribArray(0)    #positions
+        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, 2*3*sizeof(c_float()), None)
+
         # Indique comment le buffer courant (dernier vbo "bind´ e")
         # est utilis´ e pour les positions des sommets
-        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, 0, None)
+        sizefloat = sizeof(c_float())
+        GL.glEnableVertexAttribArray(1)   #normales
+        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, 2*3*sizeof(c_float()), c_void_p(3*sizefloat))
+
+        # attribution d’un autre buffer de donnees
+        vboi = GL.glGenBuffers(1)
+        # affectation du buffer courant (buffer d’indice)
+        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER,vboi)
+        # copie des indices sur la carte graphique
+        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER,index,GL.GL_STATIC_DRAW)
 
     def run(self):
 
@@ -114,7 +130,7 @@ class Game(object):
                 self.theta += 0.1
             if glfw.get_key(self.window, glfw.KEY_J) == glfw.PRESS:
                 self.theta -= 0.1
-            rot3 = pyrr.matrix33.create_from_z_rotation(self.theta)
+            rot3 = pyrr.matrix33.create_from_x_rotation(self.theta)
             rot4 = pyrr.matrix44.create_from_matrix33(rot3)
             
             prog = GL.glGetIntegerv(GL.GL_CURRENT_PROGRAM)
@@ -125,7 +141,7 @@ class Game(object):
 
 
             # Modifie la variable pour le programme courant
-            GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)
+            GL.glDrawElements(GL.GL_TRIANGLES, 2*3, GL.GL_UNSIGNED_INT, None)
             self.sendcolor()
 
             # changement de buffer d'affichage pour éviter un effet de scintillement
