@@ -17,7 +17,10 @@ class Game(object):
         self.init_context()
         self.init_programs()
         self.init_data()    
-        self.color = (0, 0, 0)
+        self.color = (1, 0, 0)
+        self.Position = [0, 0, -5]
+        self.theta = 0
+        self.projection = 0
 
 
     def init_window(self):
@@ -42,11 +45,11 @@ class Game(object):
         GL.glEnable(GL.GL_DEPTH_TEST)
 
     def init_programs(self):
-        id = create_program_from_file("shader.vert", "shader.frag")    #Renvoie l'id du GPU
+        id = create_program_from_file("shader.vert", "shader.frag")    #Renvoie l'id du GPU   #bien se mettre sur le dossier /TP3 !
         GL.glUseProgram(id)
         
     def init_data(self):
-        sommets = np.array(((0, 0, 0), (1, 0, 0), (0, 1, 0)), np.float32)
+        sommets = np.array(((0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 0), (1, 0, 0), (0, 0, 1)), np.float32)
 
         # attribution d'une liste d'´ etat (1 indique la cr´ eation d'une seule liste)
         vao = GL.glGenVertexArrays(1)
@@ -60,7 +63,7 @@ class Game(object):
         # copie des donnees des sommets sur la carte graphique
         GL.glBufferData(GL.GL_ARRAY_BUFFER, sommets, GL.GL_STATIC_DRAW)
 
-        # Les deux commandes suivantes sont stock´ ees dans l'´ etat du vao courant
+        # Les deux commandes suivantes sont stockées dans l'´ etat du vao courant
 
 
         # Active l'utilisation des donn´ ees de positions
@@ -71,24 +74,61 @@ class Game(object):
         GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, 0, None)
 
     def run(self):
+
+        prj1 = pyrr.matrix44.create_perspective_projection(50, 1, 0.5, 10.0, dtype=None)
+        prog = GL.glGetIntegerv(GL.GL_CURRENT_PROGRAM)
+        loc3 = GL.glGetUniformLocation(prog, "projection")
+        if loc3 ==-1 :
+            print("Pas de variable uniforme : projection")
+        GL.glUniformMatrix4fv(loc3, 1, GL.GL_FALSE, prj1)
+
         # boucle d'affichage
         while not glfw.window_should_close(self.window):
             # choix de la couleur de fond
-            GL.glClearColor(0.3, 0.7, 0.1, 1.0)
+            GL.glClearColor(1, 0.7, 0.1, 1.0)
             # nettoyage de la fenêtre : fond et profondeur
             GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-            # changement de buffer d'affichage pour éviter un effet de scintillement
-              # R´ ecup` ere l'identifiant du programme courant
+
+            if glfw.get_key(self.window, glfw.KEY_UP) == glfw.PRESS:
+                self.Position[1] += 0.01
+            if glfw.get_key(self.window, glfw.KEY_DOWN) == glfw.PRESS:
+                self.Position[1] -= 0.01
+            if glfw.get_key(self.window, glfw.KEY_RIGHT) == glfw.PRESS:
+                self.Position[0] += 0.01
+            if glfw.get_key(self.window, glfw.KEY_LEFT) == glfw.PRESS:
+                self.Position[0] -= 0.01
+            
+            if glfw.get_key(self.window, glfw.KEY_P) == glfw.PRESS:
+                self.Position[2] += 0.1
+            if glfw.get_key(self.window, glfw.KEY_M) == glfw.PRESS:
+                self.Position[2] -= 0.1
+
             prog = GL.glGetIntegerv(GL.GL_CURRENT_PROGRAM)
-            # R´ ecup` ere l'identifiant de la variable translation dans le programme courant
-            loc = GL.glGetUniformLocation(prog, "translation")
-            # V´ erifie que la variable existe
-            if loc ==-1 :
+            loc1 = GL.glGetUniformLocation(prog, "translation")
+            if loc1 ==-1 :
                 print("Pas de variable uniforme : translation")
+            GL.glUniform4f(loc1, self.Position[0], self.Position[1], self.Position[2], 0)
+
+
+            if glfw.get_key(self.window, glfw.KEY_I) == glfw.PRESS:
+                self.theta += 0.1
+            if glfw.get_key(self.window, glfw.KEY_J) == glfw.PRESS:
+                self.theta -= 0.1
+            rot3 = pyrr.matrix33.create_from_z_rotation(self.theta)
+            rot4 = pyrr.matrix44.create_from_matrix33(rot3)
+            
+            prog = GL.glGetIntegerv(GL.GL_CURRENT_PROGRAM)
+            loc2 = GL.glGetUniformLocation(prog, "rotation")
+            if loc2 ==-1 :
+                print("Pas de variable uniforme : rotation")
+            GL.glUniformMatrix4fv(loc2, 1, GL.GL_FALSE, rot4)
+
+
             # Modifie la variable pour le programme courant
-            a = np.cos(glfw.get_time())
-            GL.glUniform4f(loc,a, 0, 0, 0)    #plutôt le mettre avant le "Draw Array"
             GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)
+            self.sendcolor()
+
+            # changement de buffer d'affichage pour éviter un effet de scintillement
             glfw.swap_buffers(self.window)
             # gestion des évènements
             glfw.poll_events()
@@ -100,19 +140,17 @@ class Game(object):
                 glfw.set_window_should_close(win, glfw.TRUE)
             if key == glfw.KEY_R and action == glfw.PRESS :
                 self.color = (0, 1, 0)
+
             self.sendcolor()
 
-prog = GL.glGetIntegerv(GL.GL_CURRENT_PROGRAM)
-loc = GL.glGetUniformLocation(prog, "rotation")
-GL.glUniformMatrix4fv(loc, 1, GL.GL_FALSE, rot4)
 
 
-def sendcolor(self):
-        prog = GL.glGetIntegerv(GL.GL_CURRENT_PROGRAM)
-        loc = GL.glGetUniformLocation(prog, "color1")
-        if loc ==-1 :
-            print("Pas de variable uniforme : color1")
-        GL.glUniform4f(loc, self.color[0], self.color[1], self.color[2], 0)
+    def sendcolor(self):
+            prog = GL.glGetIntegerv(GL.GL_CURRENT_PROGRAM)
+            loc = GL.glGetUniformLocation(prog, "color1")
+            if loc ==-1 :
+                print("Pas de variable uniforme : color1")
+            GL.glUniform4f(loc, self.color[0], self.color[1], self.color[2], 0)
             
                 
 
